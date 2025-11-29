@@ -10,12 +10,17 @@ class GoalCreate(BaseModel):
     """Create goal request."""
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
-    icon: str = "🎯"
+    icon: Optional[str] = "🎯"
+    emoji: Optional[str] = None  # Alias for icon (frontend uses this)
     target_amount: float = Field(..., gt=0)
     target_date: Optional[datetime] = None
     monthly_contribution: float = Field(default=0, ge=0)
     auto_allocate: bool = True
     priority: int = Field(default=5, ge=1, le=10)
+    
+    def get_icon(self) -> str:
+        """Get icon, preferring emoji if provided."""
+        return self.emoji or self.icon or "🎯"
     
     class Config:
         json_schema_extra = {

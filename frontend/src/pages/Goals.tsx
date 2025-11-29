@@ -50,7 +50,7 @@ function Goals() {
         name: newGoal.name,
         emoji: newGoal.emoji,
         target_amount: parseFloat(newGoal.target_amount),
-        target_date: newGoal.target_date || undefined,
+        target_date: newGoal.target_date ? `${newGoal.target_date}T00:00:00` : undefined,
         priority: newGoal.priority,
       })
       toast.success('Goal created! 🎯')

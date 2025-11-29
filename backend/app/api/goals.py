@@ -82,7 +82,7 @@ async def create_goal(
     goal = Goal(
         user_id=user_oid,
         name=goal_data.name,
-        icon=getattr(goal_data, 'icon', None) or "🎯",
+        icon=goal_data.get_icon(),
         target_amount=goal_data.target_amount,
         current_amount=0,
         target_date=goal_data.target_date,
