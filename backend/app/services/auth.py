@@ -26,18 +26,26 @@ class AuthService:
     @staticmethod
     def _truncate_password(password: str) -> str:
         """Truncate password to 72 bytes for bcrypt compatibility."""
-        # Encode to bytes, truncate, decode back
-        return password.encode('utf-8')[:MAX_PASSWORD_LENGTH].decode('utf-8', errors='ignore')
+        # Encode to bytes and truncate at byte boundary
+        encoded = password.encode('utf-8')
+        if len(encoded) <= MAX_PASSWORD_LENGTH:
+            return password
+        # Truncate to 72 bytes, handling multi-byte chars properly
+        truncated = encoded[:MAX_PASSWORD_LENGTH]
+        # Decode safely, ignoring incomplete multi-byte sequences at the end
+        return truncated.decode('utf-8', errors='ignore')
     
     @staticmethod
     def hash_password(password: str) -> str:
         """Hash a password."""
-        return pwd_context.hash(AuthService._truncate_password(password))
+        truncated = AuthService._truncate_password(password)
+        return pwd_context.hash(truncated)
     
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash."""
-        return pwd_context.verify(AuthService._truncate_password(plain_password), hashed_password)
+        truncated = AuthService._truncate_password(plain_password)
+        return pwd_context.verify(truncated, hashed_password)
     
     @staticmethod
     def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

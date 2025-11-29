@@ -63,6 +63,18 @@ async def register(data: UserRegister):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+    except Exception as e:
+        # Catch any bcrypt or other errors
+        error_msg = str(e)
+        if "72 bytes" in error_msg or "password" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password is too long. Please use a shorter password.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed. Please try again.",
+        )
 
 
 @router.post("/login", response_model=Token)
