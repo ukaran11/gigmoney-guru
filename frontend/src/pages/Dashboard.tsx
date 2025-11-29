@@ -223,6 +223,16 @@ function Dashboard() {
           {/* Agent Mode Selection */}
           <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             <button
+              onClick={() => handleRunAgents('enhanced')}
+              disabled={isRunningAgents}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 ${
+                agenticMode === 'enhanced' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' : 'hover:bg-gray-200'
+              }`}
+              title="Enhanced Mode - Planning + Reflection + Debate + Learning"
+            >
+              🚀 Enhanced
+            </button>
+            <button
               onClick={() => handleRunAgents('react')}
               disabled={isRunningAgents}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 ${

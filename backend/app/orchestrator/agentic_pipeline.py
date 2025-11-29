@@ -6,6 +6,7 @@ This is the main orchestrator that implements TRUE agentic behavior:
 2. ReAct Pattern - Agents can reason, act, observe, repeat
 3. Tool Calling - Agents can query data and take actions
 4. Memory - Decisions are logged for learning
+5. ENHANCED MODE - Planning, Self-Reflection, Debate, Learning
 """
 from typing import Dict, Any, List
 from datetime import datetime
@@ -13,6 +14,7 @@ import asyncio
 
 from app.orchestrator.agent_router import route_agents
 from app.agents.react_agent import run_react_agent
+from app.agents.enhanced_react_agent import run_enhanced_react_agent
 from app.agents.income_pattern import IncomePatternAgent
 from app.agents.cashflow_planner import CashflowPlannerAgent
 from app.agents.obligation_risk import ObligationRiskAgent
@@ -37,37 +39,87 @@ AGENT_MAP = {
 }
 
 
-async def run_fully_agentic_pipeline(state: Dict[str, Any], use_react: bool = True, user_id: str = None) -> Dict[str, Any]:
+async def run_fully_agentic_pipeline(state: Dict[str, Any], use_react: bool = True, user_id: str = None, mode: str = None) -> Dict[str, Any]:
     """
     Run the fully agentic pipeline.
     
-    This pipeline has THREE modes:
+    This pipeline has FOUR modes:
     
-    1. FULL REACT MODE (use_react=True, default):
+    1. FULL REACT MODE (mode="react" or use_react=True):
        - Single ReAct agent handles everything
        - Has tools to query data and take actions
        - Maximum autonomy, minimum structure
+    
+    2. ENHANCED MODE (mode="enhanced"):
+       - Planning: Creates multi-step plan before execution
+       - Self-Reflection: Validates each action succeeded
+       - Debate: Multiple perspectives before final decision
+       - Learning: Adjusts behavior based on past outcomes
        
-    2. ROUTED MODE (use_react=False):
+    3. ROUTED MODE (mode="routed" or use_react=False):
        - Router LLM decides which specialist agents to run
        - Each specialist agent runs independently
        - More structured but still autonomous routing
+    
+    4. FAST MODE (mode="fast"):
+       - No LLM calls, just rule-based analysis
+       - Fastest execution
     
     Args:
         state: The current financial state
         use_react: If True, use single ReAct agent. If False, use router + specialists.
         user_id: User ID for database persistence
+        mode: Explicit mode selection ("react", "enhanced", "routed", "fast")
     
     Returns:
         Updated state with agent analysis results
     """
     start_time = datetime.now()
     
+    # Determine mode
+    if mode is None:
+        mode = "react" if use_react else "routed"
+    
     # Initialize agent activity log
     state["agent_activity"] = []
-    state["agentic_mode"] = "react" if use_react else "routed"
+    state["agentic_mode"] = mode
     
-    if use_react:
+    if mode == "enhanced":
+        # ENHANCED MODE - Full agentic capabilities
+        state["agent_activity"].append({
+            "agent": "EnhancedReActAgent",
+            "status": "running",
+            "message": "🧠 AI is planning, analyzing, reflecting, and debating...",
+            "features": ["planning", "self-reflection", "debate", "learning"],
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # Run the Enhanced ReAct agent
+        state = await run_enhanced_react_agent(state, user_id=user_id)
+        
+        # Build detailed completion message
+        tool_count = len(state.get("tool_calls_log", []))
+        iterations = state.get("react_iterations", 0)
+        reflections = len(state.get("reflections", []))
+        debate = state.get("debate_result", {})
+        plan_revisions = state.get("plan_revisions", 0)
+        
+        state["agent_activity"].append({
+            "agent": "EnhancedReActAgent",
+            "status": "completed",
+            "message": f"Deep analysis with {tool_count} tools, {reflections} reflections, {plan_revisions} plan revisions",
+            "tools_called": tool_count,
+            "iterations": iterations,
+            "reflections_count": reflections,
+            "plan_revisions": plan_revisions,
+            "debate_held": bool(debate),
+            "debate_confidence": debate.get("confidence"),
+            "advisors_consulted": [p.get("advisor") for p in debate.get("individual_perspectives", [])],
+            "learnings_applied": bool(state.get("learnings")),
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    elif mode == "react":
         # FULL REACT MODE - Single agent with tools
         state["agent_activity"].append({
             "agent": "ReActAgent",
@@ -309,14 +361,17 @@ async def run_agent_with_mode(state: Dict[str, Any], mode: str = "react", user_i
     Run agents with a specific mode.
     
     Modes:
+    - "enhanced": Full agentic with planning, reflection, debate, learning
     - "react": Full ReAct agent (maximum autonomy)
     - "routed": Router + specialist agents
     - "fast": Just run essential analysis (no LLM)
     """
-    if mode == "react":
-        return await run_fully_agentic_pipeline(state, use_react=True, user_id=user_id)
+    if mode == "enhanced":
+        return await run_fully_agentic_pipeline(state, mode="enhanced", user_id=user_id)
+    elif mode == "react":
+        return await run_fully_agentic_pipeline(state, mode="react", user_id=user_id)
     elif mode == "routed":
-        return await run_fully_agentic_pipeline(state, use_react=False, user_id=user_id)
+        return await run_fully_agentic_pipeline(state, mode="routed", user_id=user_id)
     elif mode == "fast":
         # Fast mode - no LLM, just calculations
         from app.orchestrator.graph import run_agent_graph
@@ -324,4 +379,4 @@ async def run_agent_with_mode(state: Dict[str, Any], mode: str = "react", user_i
         result["agentic_mode"] = "fast"
         return result
     else:
-        return await run_fully_agentic_pipeline(state, use_react=True, user_id=user_id)
+        return await run_fully_agentic_pipeline(state, mode="react", user_id=user_id)

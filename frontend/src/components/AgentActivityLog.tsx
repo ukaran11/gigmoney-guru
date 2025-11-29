@@ -12,6 +12,14 @@ interface AgentActivity {
   reasoning_chain?: Array<{ iteration: number; thought: string }>
   urgency?: string
   timestamp: string
+  // Enhanced mode fields
+  features?: string[]
+  reflections_count?: number
+  plan_revisions?: number
+  debate_held?: boolean
+  debate_confidence?: number
+  advisors_consulted?: string[]
+  learnings_applied?: boolean
 }
 
 interface ToolCall {
@@ -38,6 +46,9 @@ interface AgentActivityLogProps {
 }
 
 const AGENT_INFO: Record<string, { icon: React.ReactNode; color: string; name: string }> = {
+  // Enhanced agentic agent
+  EnhancedReActAgent: { icon: <Brain size={16} />, color: 'bg-gradient-to-r from-purple-600 to-pink-600', name: 'Enhanced AI (Plan+Reflect+Debate+Learn)' },
+  
   // New agentic agents
   ReActAgent: { icon: <Brain size={16} />, color: 'bg-purple-600', name: 'ReAct Agent' },
   AgentRouter: { icon: <Route size={16} />, color: 'bg-blue-600', name: 'Agent Router' },
@@ -119,11 +130,13 @@ export default function AgentActivityLog({
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-gray-900">AI Agent Activity</h3>
               <span className={`text-xs px-2 py-0.5 rounded-full ${
+                agenticMode === 'enhanced' ? 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700' :
                 agenticMode === 'react' ? 'bg-purple-100 text-purple-700' : 
                 agenticMode === 'routed' ? 'bg-blue-100 text-blue-700' :
                 'bg-gray-100 text-gray-700'
               }`}>
-                {agenticMode === 'react' ? '🧠 ReAct Mode' : 
+                {agenticMode === 'enhanced' ? '🚀 Enhanced Mode' :
+                 agenticMode === 'react' ? '🧠 ReAct Mode' : 
                  agenticMode === 'routed' ? '🔀 Routed Mode' : 
                  '⚡ Fast Mode'}
               </span>
@@ -205,6 +218,53 @@ export default function AgentActivityLog({
                           'bg-green-100 text-green-700'
                         }`}>
                           Urgency: {activity.urgency}
+                        </span>
+                      )}
+                      {/* Enhanced Mode Features */}
+                      {activity.features && activity.features.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {activity.features.map((feature, idx) => (
+                            <span key={idx} className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                              {feature === 'planning' ? '📋 Planning' :
+                               feature === 'self-reflection' ? '🪞 Reflection' :
+                               feature === 'debate' ? '🗣️ Debate' :
+                               feature === 'learning' ? '📚 Learning' : feature}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {activity.reflections_count != null && activity.reflections_count > 0 && (
+                        <span className="inline-block mt-1 mr-2 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                          🪞 {activity.reflections_count} reflections
+                        </span>
+                      )}
+                      {activity.plan_revisions != null && activity.plan_revisions > 0 && (
+                        <span className="inline-block mt-1 mr-2 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+                          📋 {activity.plan_revisions} plan revisions
+                        </span>
+                      )}
+                      {activity.debate_held && (
+                        <div className="mt-2 p-2 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="font-medium text-purple-700">🗣️ Debate held</span>
+                            {activity.debate_confidence && (
+                              <span className="text-gray-600">({Math.round(activity.debate_confidence * 100)}% consensus)</span>
+                            )}
+                          </div>
+                          {activity.advisors_consulted && activity.advisors_consulted.length > 0 && (
+                            <div className="flex gap-1 mt-1 flex-wrap">
+                              {activity.advisors_consulted.map((advisor, idx) => (
+                                <span key={idx} className="text-[10px] px-1.5 py-0.5 bg-white text-gray-600 rounded">
+                                  {advisor}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {activity.learnings_applied && (
+                        <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                          📚 Past learnings applied
                         </span>
                       )}
                     </div>
