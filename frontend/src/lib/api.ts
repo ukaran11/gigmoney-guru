@@ -1,6 +1,8 @@
 import axios from 'axios'
+import { API_URL } from '../config'
 
-const API_BASE_URL = '/api'
+// Use environment-based API URL with /api prefix
+const API_BASE_URL = `${API_URL}/api`
 
 const api = axios.create({
   baseURL: API_BASE_URL,
