@@ -93,10 +93,11 @@
 > *"When Ravi needs cash, traditional apps offer 30% interest payday loans. We offer micro-advances with strict guardrails:"*
 
 **Point out on the Advance screen:**
-- Maximum: 40% of weekly income
-- Only 1 active advance at a time
+- Maximum: 40% of weekly income (total limit)
+- Up to 3 advances at a time (but total capped)
 - Fee: Just 1% (transparent, no hidden charges)
 - Auto-repay from weekend earnings
+- Progress bar shows how much of your limit is used
 
 > *"Look at this explainability: 'Sunday ko jab Uber se ₹2,000 aayega, ₹1,212 auto-repay ho jayega. Remaining ₹788 safe to spend rehega.'"*
 

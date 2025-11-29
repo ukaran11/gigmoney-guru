@@ -17,8 +17,8 @@ class AdvanceService:
     
     # Guardrails
     MAX_ADVANCE_PCT_OF_WEEKLY = 0.40
-    MAX_ACTIVE_ADVANCES = 1
-    MIN_ADVANCE_AMOUNT = 500
+    MAX_ACTIVE_ADVANCES = 3  # Allow up to 3 advances, but total capped at 40% of weekly income
+    MIN_ADVANCE_AMOUNT = 100
     MAX_ADVANCE_AMOUNT = 5000
     
     @staticmethod
@@ -33,14 +33,6 @@ class AdvanceService:
         active_advances = await AdvanceService.get_active_advances(user_id)
         outstanding = sum(a.total_repayable - a.amount_repaid for a in active_advances)
         
-        if len(active_advances) >= AdvanceService.MAX_ACTIVE_ADVANCES:
-            return {
-                "max_amount": 0,
-                "outstanding": outstanding,
-                "can_request": False,
-                "reason": "You already have an active advance. Please repay it first."
-            }
-        
         # Calculate weekly income estimate
         week_ago = datetime.utcnow() - timedelta(days=7)
         recent_income = await IncomeEvent.find(
@@ -52,24 +44,38 @@ class AdvanceService:
         if weekly_income < 1000:
             weekly_income = 15000  # Default estimate
         
-        # Calculate max advance
-        max_amount = min(
+        # Calculate max total allowed (40% of weekly income, capped at MAX_ADVANCE_AMOUNT)
+        max_total_allowed = min(
             weekly_income * AdvanceService.MAX_ADVANCE_PCT_OF_WEEKLY,
             AdvanceService.MAX_ADVANCE_AMOUNT
         )
-        max_amount = max(max_amount - outstanding, 0)
-        max_amount = round(max_amount, -2)  # Round to nearest 100
         
-        if max_amount < AdvanceService.MIN_ADVANCE_AMOUNT:
+        # Available = max allowed - what's already outstanding
+        available_amount = max(max_total_allowed - outstanding, 0)
+        available_amount = round(available_amount, -2)  # Round to nearest 100
+        
+        # Check guardrails
+        if len(active_advances) >= AdvanceService.MAX_ACTIVE_ADVANCES:
             return {
                 "max_amount": 0,
+                "max_total_allowed": max_total_allowed,
                 "outstanding": outstanding,
                 "can_request": False,
-                "reason": "Your current income doesn't qualify for an advance right now."
+                "reason": f"Maximum {AdvanceService.MAX_ACTIVE_ADVANCES} active advances allowed. Please repay one first."
+            }
+        
+        if available_amount < AdvanceService.MIN_ADVANCE_AMOUNT:
+            return {
+                "max_amount": 0,
+                "max_total_allowed": max_total_allowed,
+                "outstanding": outstanding,
+                "can_request": False,
+                "reason": f"You've used most of your advance limit (₹{outstanding:.0f} of ₹{max_total_allowed:.0f}). Repay to unlock more."
             }
         
         return {
-            "max_amount": max_amount,
+            "max_amount": available_amount,
+            "max_total_allowed": max_total_allowed,
             "outstanding": outstanding,
             "can_request": True,
             "weekly_income": weekly_income,

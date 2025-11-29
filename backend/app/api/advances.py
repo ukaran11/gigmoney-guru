@@ -72,6 +72,7 @@ async def get_available_advance(
     
     return {
         "max_advance_amount": available["max_amount"],
+        "max_total_allowed": available.get("max_total_allowed", 0),
         "current_outstanding": available["outstanding"],
         "can_request": available["can_request"],
         "reason": available.get("reason"),

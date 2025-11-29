@@ -26,10 +26,19 @@ interface AdvanceStats {
   on_time_repayment_rate: number
 }
 
+interface AvailableAdvance {
+  max_advance_amount: number
+  max_total_allowed?: number
+  current_outstanding?: number
+  can_request: boolean
+  reason?: string
+  fee_rate?: number
+}
+
 function Advances() {
   const [advances, setAdvances] = useState<Advance[]>([])
   const [stats, setStats] = useState<AdvanceStats | null>(null)
-  const [available, setAvailable] = useState<{ max_advance_amount: number; can_request: boolean; reason?: string } | null>(null)
+  const [available, setAvailable] = useState<AvailableAdvance | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [requestAmount, setRequestAmount] = useState('')
@@ -120,6 +129,11 @@ function Advances() {
             <p className={`text-3xl font-bold ${available?.can_request ? 'text-white' : 'text-gray-900'}`}>
               ₹{available?.max_advance_amount?.toLocaleString() || 0}
             </p>
+            {available?.max_total_allowed && (
+              <p className={`text-sm mt-1 ${available?.can_request ? 'text-white/70' : 'text-gray-500'}`}>
+                Limit: ₹{available.max_total_allowed.toLocaleString()} | Used: ₹{(available.current_outstanding || 0).toLocaleString()}
+              </p>
+            )}
             {!available?.can_request && available?.reason && (
               <p className="text-sm text-gray-500 mt-2">{available.reason}</p>
             )}
@@ -131,6 +145,20 @@ function Advances() {
             </div>
           )}
         </div>
+        {/* Progress bar showing usage */}
+        {available?.max_total_allowed && available.max_total_allowed > 0 && (
+          <div className="mt-4">
+            <div className={`w-full rounded-full h-2 ${available?.can_request ? 'bg-white/20' : 'bg-gray-300'}`}>
+              <div
+                className={`h-2 rounded-full transition-all duration-500 ${available?.can_request ? 'bg-white' : 'bg-orange-500'}`}
+                style={{ width: `${Math.min(100, ((available.current_outstanding || 0) / available.max_total_allowed) * 100)}%` }}
+              />
+            </div>
+            <p className={`text-xs mt-1 ${available?.can_request ? 'text-white/60' : 'text-gray-400'}`}>
+              {((available.current_outstanding || 0) / available.max_total_allowed * 100).toFixed(0)}% of limit used
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -161,14 +189,18 @@ function Advances() {
           <h2 className="font-semibold text-gray-900">Advance History</h2>
         </div>
         <div className="divide-y divide-gray-100">
-          {advances.map((advance) => (
+          {advances.map((advance) => {
+            const isActive = advance.status === 'approved' || advance.status === 'active' || advance.status === 'accepted'
+            const isRepaid = advance.status === 'repaid'
+            
+            return (
             <div key={advance.id} className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className={`p-2 rounded-lg ${
-                  advance.status === 'repaid' ? 'bg-green-100' : 
-                  advance.status === 'approved' ? 'bg-orange-100' : 'bg-gray-100'
+                  isRepaid ? 'bg-green-100' : 
+                  isActive ? 'bg-orange-100' : 'bg-gray-100'
                 }`}>
-                  {advance.status === 'repaid' ? (
+                  {isRepaid ? (
                     <CheckCircle className="text-green-600" size={20} />
                   ) : (
                     <Clock className="text-orange-600" size={20} />
@@ -178,33 +210,39 @@ function Advances() {
                   <p className="font-medium text-gray-900">₹{advance.amount.toLocaleString()}</p>
                   <p className="text-sm text-gray-500">
                     {advance.approved_at && format(new Date(advance.approved_at), 'MMM d, yyyy')}
-                    {advance.status === 'approved' && advance.due_date && (
+                    {!advance.approved_at && advance.created_at && format(new Date(advance.created_at), 'MMM d, yyyy')}
+                    {isActive && advance.due_date && (
                       <span className="text-orange-600 ml-2">
                         Due: {format(new Date(advance.due_date), 'MMM d')}
                       </span>
                     )}
                   </p>
+                  {isActive && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      Total to repay: ₹{advance.total_repayment?.toLocaleString() || (advance.amount * 1.01).toFixed(0)}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="text-right">
                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                  advance.status === 'repaid' ? 'bg-green-100 text-green-700' :
-                  advance.status === 'approved' ? 'bg-orange-100 text-orange-700' :
+                  isRepaid ? 'bg-green-100 text-green-700' :
+                  isActive ? 'bg-orange-100 text-orange-700' :
                   'bg-gray-100 text-gray-700'
                 }`}>
                   {advance.status}
                 </span>
-                {advance.status === 'approved' && (
+                {isActive && (
                   <button
                     onClick={() => repayAdvance(advance.id)}
-                    className="block mt-2 text-sm text-primary-600 hover:text-primary-700"
+                    className="block mt-2 px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    Mark as Repaid
+                    💰 Repay Now
                   </button>
                 )}
               </div>
             </div>
-          ))}
+          )})}
           {advances.length === 0 && (
             <div className="p-8 text-center text-gray-500">
               <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
