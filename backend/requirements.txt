@@ -1,0 +1,35 @@
+# FastAPI and server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Database
+motor==3.3.2
+beanie==1.23.6
+pymongo==4.6.0
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# LangGraph and LLM
+langgraph==0.0.40
+langchain-openai==0.0.8
+langchain-core==0.1.52
+openai==1.12.0
+
+# Data processing
+pydantic==2.5.2
+pydantic-settings==2.1.0
+
+# Charts
+matplotlib==3.8.2
+numpy==1.26.2
+
+# Utilities
+python-dateutil==2.8.2
+httpx==0.25.2
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
