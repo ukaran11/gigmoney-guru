@@ -27,18 +27,20 @@ class ExpenseCreate(BaseModel):
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
 
-# Priority order for cascade deduction (lower priority buckets drained first)
+# Priority order for cascade deduction (safer buckets first, reserved buckets last)
 DEDUCTION_PRIORITY = [
     "discretionary",  # Safe to spend - use first
     "flex",           # Flexible spending
-    "savings",        # Savings - reluctantly use
     "fuel",           # Category-specific
-    "emergency",      # Emergency - last resort
-    # Never touch: rent, emi, tax (reserved for obligations)
+    "savings",        # Savings - reluctantly use
+    "emergency",      # Emergency - use carefully
+    "tax",            # Tax savings - warn but allow
+    "emi",            # EMI - warn but allow  
+    "rent",           # Rent - last resort, warn strongly
 ]
 
-# Buckets that should NEVER be used for regular expenses
-PROTECTED_BUCKETS = ["rent", "emi", "tax"]
+# Buckets reserved for bills - trigger extra warning when used
+RESERVED_BUCKETS = ["rent", "emi", "tax"]
 
 
 @router.post("/")
@@ -49,8 +51,8 @@ async def add_expense(
     """
     Add a new expense with CASCADE DEDUCTION across buckets.
     
-    If the primary bucket doesn't have enough funds, we cascade through
-    other buckets in priority order until the expense is fully covered.
+    Deducts from ALL buckets in priority order until expense is covered.
+    Reserved buckets (rent, emi, tax) are used last and trigger warnings.
     """
     user_oid = PydanticObjectId(str(current_user.id))
     
@@ -85,26 +87,21 @@ async def add_expense(
             detail="No buckets configured. Please add income first."
         )
     
-    # Calculate total available balance (excluding protected buckets)
-    total_available = sum(
-        b.current_balance for b in all_buckets 
-        if b.name not in PROTECTED_BUCKETS
-    )
+    # Calculate totals - ALL buckets are now available
     total_all = sum(b.current_balance for b in all_buckets)
     
-    # Check if expense exceeds available funds
+    # Check if expense exceeds total funds
     expense_amount = expense_data.amount
-    is_overspending = expense_amount > total_available
-    uncovered_amount = max(0, expense_amount - total_available)
+    is_overspending = expense_amount > total_all
+    uncovered_amount = max(0, expense_amount - total_all)
     
     # If overspending and not forced, return warning
     if is_overspending and not expense_data.force:
         return {
             "success": False,
             "warning": True,
-            "message": f"⚠️ Expense ₹{expense_amount:,.0f} exceeds available balance ₹{total_available:,.0f}",
-            "total_available": total_available,
-            "total_all_buckets": total_all,
+            "message": f"⚠️ Expense ₹{expense_amount:,.0f} exceeds total balance ₹{total_all:,.0f}",
+            "total_available": total_all,
             "shortfall": uncovered_amount,
             "hint": "Set force=true to record anyway, or reduce the amount",
         }
@@ -113,8 +110,8 @@ async def add_expense(
     bucket_map = {b.name: b for b in all_buckets}
     ordered_buckets = []
     
-    # Add primary bucket first if it exists and is not protected
-    if primary_bucket_name in bucket_map and primary_bucket_name not in PROTECTED_BUCKETS:
+    # Add primary bucket first if it exists
+    if primary_bucket_name in bucket_map:
         ordered_buckets.append(bucket_map[primary_bucket_name])
     
     # Add remaining buckets in priority order
@@ -122,14 +119,15 @@ async def add_expense(
         if bucket_name in bucket_map and bucket_name != primary_bucket_name:
             ordered_buckets.append(bucket_map[bucket_name])
     
-    # Add any other non-protected buckets not in priority list
+    # Add any other buckets not in priority list
     for bucket in all_buckets:
-        if bucket not in ordered_buckets and bucket.name not in PROTECTED_BUCKETS:
+        if bucket not in ordered_buckets:
             ordered_buckets.append(bucket)
     
     # CASCADE DEDUCTION
     remaining_to_deduct = expense_amount
     deductions = []
+    used_reserved_buckets = []
     
     for bucket in ordered_buckets:
         if remaining_to_deduct <= 0:
@@ -142,6 +140,10 @@ async def add_expense(
         deduct_amount = min(bucket.current_balance, remaining_to_deduct)
         old_balance = bucket.current_balance
         
+        # Track if we're using reserved buckets
+        if bucket.name in RESERVED_BUCKETS and deduct_amount > 0:
+            used_reserved_buckets.append(bucket.display_name)
+        
         # Update bucket
         bucket.current_balance -= deduct_amount
         bucket.updated_at = datetime.now()
@@ -153,6 +155,7 @@ async def add_expense(
             "amount_deducted": deduct_amount,
             "old_balance": old_balance,
             "new_balance": bucket.current_balance,
+            "is_reserved": bucket.name in RESERVED_BUCKETS,
         })
         
         remaining_to_deduct -= deduct_amount
@@ -185,18 +188,22 @@ async def add_expense(
     
     # Build response message
     if len(deductions) == 1:
-        message = f"₹{expense_amount:,.0f} deducted from {deductions[0]['display_name']}"
+        message = f"₹{total_deducted:,.0f} deducted from {deductions[0]['display_name']}"
     elif len(deductions) > 1:
         bucket_names = ", ".join(d['display_name'] for d in deductions[:3])
         message = f"₹{total_deducted:,.0f} deducted from {bucket_names}"
         if len(deductions) > 3:
             message += f" (+{len(deductions) - 3} more)"
     else:
-        message = f"₹{expense_amount:,.0f} expense recorded (no buckets to deduct from)"
+        message = f"₹{expense_amount:,.0f} expense recorded (no funds to deduct)"
+    
+    # Add warning if we used reserved buckets
+    if used_reserved_buckets:
+        message += f" ⚠️ Used: {', '.join(used_reserved_buckets)}"
     
     # Add warning if overspending
-    if is_overspending:
-        message += f" ⚠️ Overspent by ₹{uncovered_amount:,.0f}!"
+    if remaining_to_deduct > 0:
+        message += f" 💸 ₹{remaining_to_deduct:,.0f} uncovered!"
     
     return {
         "success": True,
@@ -205,7 +212,8 @@ async def add_expense(
         "expense_amount": expense_amount,
         "total_deducted": total_deducted,
         "uncovered_amount": remaining_to_deduct,
-        "is_overspending": is_overspending,
+        "is_overspending": remaining_to_deduct > 0,
+        "used_reserved_buckets": used_reserved_buckets,
         "deductions": deductions,
         "new_total_balance": new_total_balance,
         "new_safe_to_spend": new_safe_to_spend,

@@ -136,11 +136,11 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess }: AddExpen
               <div className="flex-1">
                 <p className="font-medium text-amber-800">Insufficient Funds!</p>
                 <p className="text-sm text-amber-700 mt-1">
-                  You're trying to spend ₹{parseFloat(amount).toLocaleString()} but only have 
-                  ₹{warning.total_available.toLocaleString()} available.
+                  You're trying to spend ₹{parseFloat(amount).toLocaleString()} but your total balance is only 
+                  ₹{warning.total_available.toLocaleString()}.
                 </p>
                 <p className="text-sm text-amber-600 mt-2">
-                  Shortfall: <span className="font-bold">₹{warning.shortfall.toLocaleString()}</span>
+                  Shortfall: <span className="font-bold text-red-600">₹{warning.shortfall.toLocaleString()}</span>
                 </p>
                 <div className="flex gap-2 mt-3">
                   <button
@@ -148,7 +148,7 @@ export default function AddExpenseModal({ isOpen, onClose, onSuccess }: AddExpen
                     disabled={isLoading}
                     className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                   >
-                    Record Anyway
+                    Deduct ₹{warning.total_available.toLocaleString()} Anyway
                   </button>
                   <button
                     onClick={() => setWarning(null)}
