@@ -1,11 +1,11 @@
 """
 GigMoney Guru - Expenses API
 
-Track and manage expenses.
+Track and manage expenses with CASCADE DEDUCTION across buckets.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
@@ -21,9 +21,24 @@ class ExpenseCreate(BaseModel):
     amount: float = Field(..., gt=0)
     description: Optional[str] = None
     bucket_name: Optional[str] = None  # Which bucket to deduct from
+    force: bool = False  # Force recording even if insufficient funds
 
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
+
+
+# Priority order for cascade deduction (lower priority buckets drained first)
+DEDUCTION_PRIORITY = [
+    "discretionary",  # Safe to spend - use first
+    "flex",           # Flexible spending
+    "savings",        # Savings - reluctantly use
+    "fuel",           # Category-specific
+    "emergency",      # Emergency - last resort
+    # Never touch: rent, emi, tax (reserved for obligations)
+]
+
+# Buckets that should NEVER be used for regular expenses
+PROTECTED_BUCKETS = ["rent", "emi", "tax"]
 
 
 @router.post("/")
@@ -31,13 +46,15 @@ async def add_expense(
     expense_data: ExpenseCreate,
     current_user: User = Depends(get_current_user)
 ):
-    """Add a new expense and optionally deduct from a bucket."""
+    """
+    Add a new expense with CASCADE DEDUCTION across buckets.
+    
+    If the primary bucket doesn't have enough funds, we cascade through
+    other buckets in priority order until the expense is fully covered.
+    """
     user_oid = PydanticObjectId(str(current_user.id))
     
-    # Determine which bucket to use
-    bucket_name = expense_data.bucket_name
-    
-    # Map categories to buckets
+    # Map categories to primary buckets
     category_bucket_map = {
         "food": "discretionary",
         "fuel": "fuel",
@@ -52,76 +69,146 @@ async def add_expense(
         "other": "discretionary",
     }
     
-    if not bucket_name:
-        bucket_name = category_bucket_map.get(expense_data.category.lower(), "discretionary")
+    primary_bucket_name = expense_data.bucket_name or category_bucket_map.get(
+        expense_data.category.lower(), "discretionary"
+    )
+    
+    # Get ALL active buckets for this user
+    all_buckets = await Bucket.find(
+        Bucket.user_id == user_oid,
+        Bucket.is_active == True
+    ).to_list()
+    
+    if not all_buckets:
+        raise HTTPException(
+            status_code=400,
+            detail="No buckets configured. Please add income first."
+        )
+    
+    # Calculate total available balance (excluding protected buckets)
+    total_available = sum(
+        b.current_balance for b in all_buckets 
+        if b.name not in PROTECTED_BUCKETS
+    )
+    total_all = sum(b.current_balance for b in all_buckets)
+    
+    # Check if expense exceeds available funds
+    expense_amount = expense_data.amount
+    is_overspending = expense_amount > total_available
+    uncovered_amount = max(0, expense_amount - total_available)
+    
+    # If overspending and not forced, return warning
+    if is_overspending and not expense_data.force:
+        return {
+            "success": False,
+            "warning": True,
+            "message": f"⚠️ Expense ₹{expense_amount:,.0f} exceeds available balance ₹{total_available:,.0f}",
+            "total_available": total_available,
+            "total_all_buckets": total_all,
+            "shortfall": uncovered_amount,
+            "hint": "Set force=true to record anyway, or reduce the amount",
+        }
+    
+    # Build deduction order: primary bucket first, then by priority
+    bucket_map = {b.name: b for b in all_buckets}
+    ordered_buckets = []
+    
+    # Add primary bucket first if it exists and is not protected
+    if primary_bucket_name in bucket_map and primary_bucket_name not in PROTECTED_BUCKETS:
+        ordered_buckets.append(bucket_map[primary_bucket_name])
+    
+    # Add remaining buckets in priority order
+    for bucket_name in DEDUCTION_PRIORITY:
+        if bucket_name in bucket_map and bucket_name != primary_bucket_name:
+            ordered_buckets.append(bucket_map[bucket_name])
+    
+    # Add any other non-protected buckets not in priority list
+    for bucket in all_buckets:
+        if bucket not in ordered_buckets and bucket.name not in PROTECTED_BUCKETS:
+            ordered_buckets.append(bucket)
+    
+    # CASCADE DEDUCTION
+    remaining_to_deduct = expense_amount
+    deductions = []
+    
+    for bucket in ordered_buckets:
+        if remaining_to_deduct <= 0:
+            break
+        
+        if bucket.current_balance <= 0:
+            continue
+        
+        # Calculate how much to deduct from this bucket
+        deduct_amount = min(bucket.current_balance, remaining_to_deduct)
+        old_balance = bucket.current_balance
+        
+        # Update bucket
+        bucket.current_balance -= deduct_amount
+        bucket.updated_at = datetime.now()
+        await bucket.save()
+        
+        deductions.append({
+            "bucket_name": bucket.name,
+            "display_name": bucket.display_name,
+            "amount_deducted": deduct_amount,
+            "old_balance": old_balance,
+            "new_balance": bucket.current_balance,
+        })
+        
+        remaining_to_deduct -= deduct_amount
+    
+    # Calculate what was actually deducted
+    total_deducted = expense_amount - remaining_to_deduct
     
     # Create expense record
     expense = Expense(
         user_id=user_oid,
         category=expense_data.category,
-        amount=expense_data.amount,
+        amount=expense_amount,  # Record full amount
         description=expense_data.description,
-        bucket_name=bucket_name,
+        bucket_name=primary_bucket_name,
         spent_at=datetime.now(),
         recorded_at=datetime.now(),
     )
     await expense.save()
     
-    # Try to find the bucket, fallback to discretionary, then any bucket with balance
-    bucket = await Bucket.find_one(
+    # Calculate new totals
+    updated_buckets = await Bucket.find(
         Bucket.user_id == user_oid,
-        Bucket.name == bucket_name
+        Bucket.is_active == True
+    ).to_list()
+    new_total_balance = sum(b.current_balance for b in updated_buckets)
+    new_safe_to_spend = sum(
+        b.current_balance for b in updated_buckets 
+        if b.name in ["discretionary", "flex"]
     )
     
-    # Fallback: if bucket not found, try discretionary
-    if not bucket and bucket_name != "discretionary":
-        bucket = await Bucket.find_one(
-            Bucket.user_id == user_oid,
-            Bucket.name == "discretionary"
-        )
-        if bucket:
-            bucket_name = "discretionary"
+    # Build response message
+    if len(deductions) == 1:
+        message = f"₹{expense_amount:,.0f} deducted from {deductions[0]['display_name']}"
+    elif len(deductions) > 1:
+        bucket_names = ", ".join(d['display_name'] for d in deductions[:3])
+        message = f"₹{total_deducted:,.0f} deducted from {bucket_names}"
+        if len(deductions) > 3:
+            message += f" (+{len(deductions) - 3} more)"
+    else:
+        message = f"₹{expense_amount:,.0f} expense recorded (no buckets to deduct from)"
     
-    # Final fallback: find any bucket with enough balance
-    if not bucket:
-        all_buckets = await Bucket.find(
-            Bucket.user_id == user_oid,
-            Bucket.is_active == True
-        ).sort("-current_balance").to_list()
-        
-        for b in all_buckets:
-            if b.current_balance >= expense_data.amount:
-                bucket = b
-                bucket_name = b.name
-                break
-        
-        # If no bucket has enough, use the one with highest balance
-        if not bucket and all_buckets:
-            bucket = all_buckets[0]
-            bucket_name = bucket.name
-    
-    bucket_deducted = False
-    new_balance = None
-    
-    if bucket and bucket.is_active:
-        old_balance = bucket.current_balance
-        bucket.current_balance = max(0, bucket.current_balance - expense_data.amount)
-        bucket.updated_at = datetime.now()
-        await bucket.save()
-        bucket_deducted = True
-        new_balance = bucket.current_balance
-        
-        # Update expense with actual bucket used
-        expense.bucket_name = bucket_name
-        await expense.save()
+    # Add warning if overspending
+    if is_overspending:
+        message += f" ⚠️ Overspent by ₹{uncovered_amount:,.0f}!"
     
     return {
         "success": True,
         "expense_id": str(expense.id),
-        "message": f"₹{expense_data.amount} expense recorded" + (f" from {bucket.display_name}" if bucket_deducted else ""),
-        "bucket_deducted": bucket_deducted,
-        "bucket_name": bucket_name if bucket_deducted else None,
-        "new_balance": new_balance,
+        "message": message,
+        "expense_amount": expense_amount,
+        "total_deducted": total_deducted,
+        "uncovered_amount": remaining_to_deduct,
+        "is_overspending": is_overspending,
+        "deductions": deductions,
+        "new_total_balance": new_total_balance,
+        "new_safe_to_spend": new_safe_to_spend,
     }
 
 
