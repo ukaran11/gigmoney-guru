@@ -167,35 +167,6 @@ The platform includes a demo scenario following "Ravi", a multi-platform gig wor
 - `POST /api/chat/message` - Send message to AI coach
 - `GET /api/chat/history` - Get chat history
 
-## 🏆 Hackathon Demo Script
-
-1. **Introduction** (1 min)
-   - Show login and demo data loading
-   - Explain "Ravi" persona
-
-2. **Smart Buckets** (2 min)
-   - Show auto-allocation of income
-   - Explain 50/30/15/5 split
-
-3. **AI Agent Analysis** (2 min)
-   - Click "Run AI" button
-   - Show real-time analysis
-   - Explain agent pipeline
-
-4. **Chat Coach** (2 min)
-   - Ask about budgeting in Hinglish
-   - Show personalized advice
-   - Demonstrate quick actions
-
-5. **Micro-Advance** (1 min)
-   - Show advance eligibility
-   - Request small advance
-   - Explain 1% fee model
-
-6. **Goal Tracking** (1 min)
-   - Show "School Fees" goal
-   - Add contribution
-   - Show progress update
 
 ## 📝 Environment Variables
 
