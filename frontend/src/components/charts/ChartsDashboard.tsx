@@ -3,7 +3,7 @@
  * 
  * Main dashboard that displays all financial charts.
  */
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BarChart3, RefreshCw, Expand, Minimize } from 'lucide-react';
 import CashflowForecastChart from './CashflowForecastChart';
 import BucketProgressChart from './BucketProgressChart';

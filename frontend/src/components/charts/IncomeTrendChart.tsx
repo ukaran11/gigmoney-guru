@@ -3,7 +3,6 @@
  * 
  * Shows daily income trend with platform breakdown.
  */
-import React from 'react';
 import {
   AreaChart,
   Area,
@@ -55,7 +54,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   other: '#9CA3AF'
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (

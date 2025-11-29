@@ -3,19 +3,7 @@
  * 
  * Shows progress of each financial bucket (rent, EMI, savings, etc.)
  */
-import React from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell
-} from 'recharts';
-import { Wallet, CheckCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 
 interface BucketDataPoint {
   name: string;
@@ -38,28 +26,6 @@ interface Props {
   summary: BucketSummary;
   loading?: boolean;
 }
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-lg">
-        <p className="text-white font-semibold mb-2">{data.name}</p>
-        <div className="space-y-1 text-sm">
-          <p className="text-green-400">Current: ₹{data.current.toLocaleString()}</p>
-          <p className="text-gray-400">Target: ₹{data.target.toLocaleString()}</p>
-          <p className={`font-medium ${data.percentage >= 80 ? 'text-green-400' : data.percentage >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-            Progress: {data.percentage}%
-          </p>
-          {data.gap > 0 && (
-            <p className="text-orange-400">Gap: ₹{data.gap.toLocaleString()}</p>
-          )}
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 export default function BucketProgressChart({ data, summary, loading }: Props) {
   if (loading) {

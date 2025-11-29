@@ -3,7 +3,6 @@
  * 
  * Shows expense categories as a pie chart with summary.
  */
-import React from 'react';
 import {
   PieChart,
   Pie,
@@ -12,7 +11,6 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
-import { ShoppingBag, Coffee, Home, Car, Smartphone, MoreHorizontal } from 'lucide-react';
 
 interface CategoryData {
   name: string;
@@ -42,15 +40,6 @@ const CATEGORY_COLORS = [
   '#EC4899', // Pink
   '#6B7280', // Gray
 ];
-
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  food: <Coffee className="w-4 h-4" />,
-  transport: <Car className="w-4 h-4" />,
-  rent: <Home className="w-4 h-4" />,
-  shopping: <ShoppingBag className="w-4 h-4" />,
-  phone: <Smartphone className="w-4 h-4" />,
-  other: <MoreHorizontal className="w-4 h-4" />,
-};
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -132,7 +121,7 @@ export default function ExpenseBreakdownChart({ categoryBreakdown, summary, load
               dataKey="value"
               nameKey="name"
             >
-              {categoryBreakdown.map((entry, index) => (
+              {categoryBreakdown.map((_, index) => (
                 <Cell 
                   key={`cell-${index}`} 
                   fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}

@@ -3,17 +3,6 @@
  * 
  * Shows progress towards financial goals.
  */
-import React from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell
-} from 'recharts';
 import { Target, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface GoalDataPoint {
@@ -38,27 +27,6 @@ interface Props {
   summary: GoalSummary;
   loading?: boolean;
 }
-
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-lg">
-        <p className="text-white font-semibold mb-2">{data.name}</p>
-        <div className="space-y-1 text-sm">
-          <p className="text-green-400">Saved: ₹{data.current.toLocaleString()}</p>
-          <p className="text-blue-400">Target: ₹{data.target.toLocaleString()}</p>
-          <p className="text-gray-400">{data.daysLeft} days left</p>
-          <p className="text-purple-400">Need ₹{data.dailyNeeded.toLocaleString()}/day</p>
-          <p className={data.onTrack ? 'text-green-400' : 'text-red-400'}>
-            {data.onTrack ? '✓ On Track' : '✗ Behind Schedule'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 export default function GoalProgressChart({ data, summary, loading }: Props) {
   if (loading) {

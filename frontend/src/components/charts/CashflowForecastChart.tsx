@@ -3,12 +3,10 @@
  * 
  * Shows 30-day projected cashflow with balance, income, and obligations.
  */
-import React from 'react';
 import {
   ComposedChart,
   Area,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -17,7 +15,7 @@ import {
   ResponsiveContainer,
   ReferenceLine
 } from 'recharts';
-import { TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { TrendingUp, AlertTriangle } from 'lucide-react';
 
 interface ForecastDataPoint {
   date: string;
@@ -44,7 +42,7 @@ interface Props {
   loading?: boolean;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (

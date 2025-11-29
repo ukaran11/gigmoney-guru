@@ -3,9 +3,8 @@
  * 
  * Shows financial risk score as a gauge meter.
  */
-import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { Shield, AlertTriangle, XCircle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, XCircle, CheckCircle } from 'lucide-react';
 
 interface RiskData {
   score: number;
@@ -44,8 +43,6 @@ export default function RiskGaugeChart({ data, loading }: Props) {
 
   const RiskIcon = data.level === 'low' ? CheckCircle : 
                    data.level === 'moderate' ? AlertTriangle : XCircle;
-
-  const gaugeColors = ['#EF4444', '#6B7280']; // Risk color and background
 
   return (
     <div className="bg-gray-800 rounded-xl p-6">
